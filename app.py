@@ -1,158 +1,121 @@
 import streamlit as st
 import cv2
 import numpy as np
-from PIL import Image, ImageEnhance
-import io
+from PIL import Image, ImageEnhance, ImageFilter
 
-# ===============================
-# Konfigurasi Aplikasi
-# ===============================
-st.set_page_config(page_title="Smart Image Lab", page_icon="🧠", layout="centered")
+st.set_page_config(page_title="Smart Image Lab", layout="wide")
 
-st.title("🧠 Smart Image Lab")
-st.write("Aplikasi Pengolahan Citra Digital - Filtering, Enhancement, dan Restorasi Gambar")
+st.title("🎨 Smart Image Lab - Enhanced Edition")
+st.write("Eksperimen dengan berbagai filter dan efek cerdas untuk mengubah tampilan gambar Anda!")
 
-st.markdown("---")
+uploaded_file = st.file_uploader("📤 Unggah gambar (PNG, JPG, JPEG)", type=["png", "jpg", "jpeg"])
 
-# ===============================
-# Upload Gambar
-# ===============================
-uploaded_file = st.file_uploader("📸 Upload Gambar (JPG, JPEG, PNG)", type=["jpg", "jpeg", "png"])
-
-# ===============================
-# Fungsi Filter dan Enhancement
-# ===============================
-
-def apply_filter(image, filter_type):
-    """Fungsi utama untuk menerapkan berbagai filter pada gambar"""
-    img_cv = np.array(image)
-    img_cv = cv2.cvtColor(img_cv, cv2.COLOR_RGB2BGR)
-
-    if filter_type == "Grayscale":
-        result = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-        result = cv2.cvtColor(result, cv2.COLOR_GRAY2RGB)
-
-    elif filter_type == "Gaussian Blur":
-        result = cv2.GaussianBlur(img_cv, (15, 15), 0)
-
-    elif filter_type == "Median Blur":
-        result = cv2.medianBlur(img_cv, 9)
-
-    elif filter_type == "Edge Detection (Canny)":
-        edges = cv2.Canny(img_cv, 100, 200)
-        result = cv2.cvtColor(edges, cv2.COLOR_GRAY2RGB)
-
-    elif filter_type == "Sharpen":
-        kernel = np.array([[0, -1, 0],
-                           [-1, 5, -1],
-                           [0, -1, 0]])
-        result = cv2.filter2D(img_cv, -1, kernel)
-
-    elif filter_type == "Emboss":
-        kernel = np.array([[ -2, -1, 0],
-                           [ -1, 1, 1],
-                           [ 0, 1, 2]])
-        result = cv2.filter2D(img_cv, -1, kernel)
-
-    elif filter_type == "Pencil Sketch":
-        gray, sketch = cv2.pencilSketch(img_cv, sigma_s=60, sigma_r=0.07, shade_factor=0.1)
-        result = cv2.cvtColor(sketch, cv2.COLOR_GRAY2RGB)
-
-    elif filter_type == "Stylization (Watercolor Effect)":
-        result = cv2.stylization(img_cv, sigma_s=60, sigma_r=0.6)
-
-    elif filter_type == "HDR Effect":
-        result = cv2.detailEnhance(img_cv, sigma_s=10, sigma_r=0.15)
-
-    else:
-        result = img_cv
-
-    result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
-    return result
-
-
-def enhance_image(image, brightness=1.0, contrast=1.0, sharpness=1.0):
-    """Fungsi untuk peningkatan kualitas (enhancement) citra"""
-    enhancer = ImageEnhance.Brightness(image)
-    image = enhancer.enhance(brightness)
-
-    enhancer = ImageEnhance.Contrast(image)
-    image = enhancer.enhance(contrast)
-
-    enhancer = ImageEnhance.Sharpness(image)
-    image = enhancer.enhance(sharpness)
-
-    return image
-
-
-def restore_image(image):
-    """Fungsi sederhana untuk restorasi (noise removal)"""
-    img_cv = np.array(image)
-    img_cv = cv2.cvtColor(img_cv, cv2.COLOR_RGB2BGR)
-    restored = cv2.fastNlMeansDenoisingColored(img_cv, None, 10, 10, 7, 21)
-    restored = cv2.cvtColor(restored, cv2.COLOR_BGR2RGB)
-    return restored
-
-
-# ===============================
-# Bagian Utama Aplikasi
-# ===============================
 if uploaded_file is not None:
+    # Baca gambar menggunakan PIL
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Gambar Asli", use_column_width=True)
+
+    # Konversi ke OpenCV format
+    img_array = np.array(image)
+    img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+
+    st.subheader("🧠 Pilih Filter & Efek")
+    option = st.selectbox(
+        "Pilih jenis efek atau filter:",
+        [
+            "Grayscale",
+            "Blur",
+            "Canny Edge Detection",
+            "Brightness Control",
+            "Contrast Adjustment",
+            "Pencil Sketch",
+            "Cartoonize",
+            "Emboss Effect",
+            "Sharpen Image",
+            "Sepia Tone",
+        ]
+    )
+
+    # Default hasil
+    result_img = None
+
     try:
-        # Baca dan tampilkan gambar
-        image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption="🖼️ Gambar Asli", use_container_width=True)
+        if option == "Grayscale":
+            gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+            result_img = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
-        st.markdown("### 🔧 Pilih Mode Operasi")
-        mode = st.radio("Pilih operasi yang ingin dilakukan:", 
-                        ["Filtering", "Enhancement", "Restorasi"])
+        elif option == "Blur":
+            k = st.slider("Tingkat blur", 3, 25, 9, step=2)
+            result_img = cv2.GaussianBlur(img_cv, (k, k), 0)
 
-        # -------------------- FILTER --------------------
-        if mode == "Filtering":
-            filter_option = st.selectbox("Pilih Jenis Filter:", 
-                ["Grayscale", "Gaussian Blur", "Median Blur", "Edge Detection (Canny)",
-                 "Sharpen", "Emboss", "Pencil Sketch", "Stylization (Watercolor Effect)", "HDR Effect"])
+        elif option == "Canny Edge Detection":
+            t1 = st.slider("Threshold 1", 50, 200, 100)
+            t2 = st.slider("Threshold 2", 50, 200, 150)
+            edges = cv2.Canny(img_cv, t1, t2)
+            result_img = cv2.cvtColor(edges, cv2.COLOR_GRAY2RGB)
 
-            if st.button("🔍 Terapkan Filter"):
-                filtered_img = apply_filter(image, filter_option)
-                st.image(filtered_img, caption=f"Hasil Filter: {filter_option}", use_container_width=True)
+        elif option == "Brightness Control":
+            factor = st.slider("Kecerahan", 0.1, 3.0, 1.2)
+            enhancer = ImageEnhance.Brightness(image)
+            result_img = np.array(enhancer.enhance(factor))
 
-                # Tombol download hasil filter
-                img_download = Image.fromarray(filtered_img)
-                buf = io.BytesIO()
-                img_download.save(buf, format="PNG")
-                st.download_button("💾 Download Hasil", data=buf.getvalue(),
-                                   file_name=f"filtered_{filter_option}.png", mime="image/png")
+        elif option == "Contrast Adjustment":
+            factor = st.slider("Kontras", 0.1, 3.0, 1.5)
+            enhancer = ImageEnhance.Contrast(image)
+            result_img = np.array(enhancer.enhance(factor))
 
-        # -------------------- ENHANCEMENT --------------------
-        elif mode == "Enhancement":
-            st.markdown("### ✨ Pengaturan Enhancement")
-            brightness = st.slider("Kecerahan", 0.5, 2.0, 1.0)
-            contrast = st.slider("Kontras", 0.5, 2.0, 1.0)
-            sharpness = st.slider("Ketajaman", 0.5, 3.0, 1.0)
+        elif option == "Pencil Sketch":
+            gray, sketch = cv2.pencilSketch(img_cv, sigma_s=60, sigma_r=0.07, shade_factor=0.05)
+            result_img = sketch
 
-            if st.button("⚙️ Tingkatkan Gambar"):
-                enhanced_img = enhance_image(image, brightness, contrast, sharpness)
-                st.image(enhanced_img, caption="Hasil Enhancement", use_container_width=True)
+        elif option == "Cartoonize":
+            gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+            gray = cv2.medianBlur(gray, 7)
+            edges = cv2.adaptiveThreshold(
+                gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 9, 9
+            )
+            color = cv2.bilateralFilter(img_cv, 9, 250, 250)
+            cartoon = cv2.bitwise_and(color, color, mask=edges)
+            result_img = cartoon
 
-                buf = io.BytesIO()
-                enhanced_img.save(buf, format="PNG")
-                st.download_button("💾 Download Hasil Enhancement", data=buf.getvalue(),
-                                   file_name="enhanced_image.png", mime="image/png")
+        elif option == "Emboss Effect":
+            kernel = np.array([[ -2, -1, 0 ],
+                               [ -1,  1, 1 ],
+                               [  0,  1, 2 ]])
+            embossed = cv2.filter2D(img_cv, -1, kernel) + 128
+            result_img = embossed
 
-        # -------------------- RESTORASI --------------------
-        elif mode == "Restorasi":
-            if st.button("🧼 Lakukan Restorasi"):
-                restored_img = restore_image(image)
-                st.image(restored_img, caption="Hasil Restorasi", use_container_width=True)
+        elif option == "Sharpen Image":
+            kernel = np.array([[0, -1, 0],
+                               [-1, 5, -1],
+                               [0, -1, 0]])
+            sharpened = cv2.filter2D(img_cv, -1, kernel)
+            result_img = sharpened
 
-                buf = io.BytesIO()
-                Image.fromarray(restored_img).save(buf, format="PNG")
-                st.download_button("💾 Download Hasil Restorasi", data=buf.getvalue(),
-                                   file_name="restored_image.png", mime="image/png")
+        elif option == "Sepia Tone":
+            sepia_filter = np.array([[0.272, 0.534, 0.131],
+                                     [0.349, 0.686, 0.168],
+                                     [0.393, 0.769, 0.189]])
+            sepia = cv2.transform(img_cv, sepia_filter)
+            sepia = np.clip(sepia, 0, 255)
+            result_img = sepia.astype(np.uint8)
+
+        # Tampilkan hasil akhir
+        if result_img is not None:
+            st.subheader("📸 Hasil Gambar")
+            st.image(cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB), use_column_width=True)
+
+            # Tombol unduh
+            result_pil = Image.fromarray(cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB))
+            st.download_button(
+                label="💾 Unduh Gambar Hasil",
+                data=result_pil.tobytes(),
+                file_name="hasil_filter.png",
+                mime="image/png"
+            )
 
     except Exception as e:
         st.error(f"Terjadi kesalahan saat memproses gambar: {e}")
 
 else:
-    st.info("👆 Silakan upload gambar terlebih dahulu untuk memulai.")
+    st.info("⬆️ Silakan unggah gambar terlebih dahulu untuk mulai menggunakan aplikasi.")
